@@ -1,0 +1,19 @@
+.history-card-container {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 28rpx 32rpx;
+  margin-bottom: 16rpx;
+  background-color: #fff;
+  border-radius: 20rpx;
+
+  .history-card-date {
+    font-size: 28rpx;
+    color: #333;
+  }
+
+  .history-card-result {
+    font-size: 28rpx;
+    font-weight: 500;
+  }
+}
