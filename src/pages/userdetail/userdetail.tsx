@@ -3,6 +3,13 @@ import './userdetail.scss'
 import avatarDefault from '../../assets/images/avatar.png'
 import changeIcon from '../../assets/icons/pen.svg'
 import Taro from '@tarojs/taro'
+import { useEffect, useState } from 'react'
+
+interface HistoryCard {
+  id: string
+  result: string
+  timestamp: string
+}
 
 const UserDetail = () => {
   const handleAvatarClick = async () => {
@@ -11,6 +18,27 @@ const UserDetail = () => {
       type: 'light'
     })
   }
+
+  const [historyCards, setHistoryCards] = useState<HistoryCard[]>([])
+  const [hasMore, setHasMore] = useState(true)
+  const [isLoading, setIsLoading] = useState(false)
+  const [refreshing, setRefreshing] = useState(false)
+
+  
+
+  useEffect(() => {
+    const fetchHistory = async () => {
+      // 模拟获取用户战绩数据
+      const mockHistory = [
+        { id: 1, result: 'win', timestamp: '2024-06-01' },
+        { id: 2, result: 'lose', timestamp: '2024-06-02' },
+        { id: 3, result: 'win', timestamp: '2024-06-03' },
+      ]
+      setHistoryCards(mockHistory)
+    }
+
+    fetchHistory()
+  }, [])
 
   return (
     <View className='userdetail-container'>
