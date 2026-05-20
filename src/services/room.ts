@@ -1,4 +1,4 @@
-import { supabase } from '@/lib/supabase'
+import { api } from '@/lib/supabase'
 import type { Room, RoomDetail, RoomPlayer, ScoreTransfer, GameRecord, TransferSummary } from '@/types/game'
 
 // 生成6位房间码（排除易混淆字符 0/O/1/I/L）
@@ -16,12 +16,8 @@ function generateRoomCode(): string {
 async function generateUniqueRoomCode(): Promise<string> {
   for (let i = 0; i < 5; i++) {
     const code = generateRoomCode()
-    const { data } = await supabase
-      .from('rooms')
-      .select('id')
-      .eq('room_code', code)
-      .maybeSingle()
-    if (!data) return code
+    const row = await api.maybeOne<{ id: string }>('rooms', { room_code: code }, 'id')
+    if (!row) return code
   }
   throw new Error('无法生成唯一房间码，请重试')
 }
@@ -29,53 +25,22 @@ async function generateUniqueRoomCode(): Promise<string> {
 // 创建房间
 export async function createRoom(hostId: string): Promise<Room> {
   const room_code = await generateUniqueRoomCode()
-
-  const { data: room, error } = await supabase
-    .from('rooms')
-    .insert({ room_code, host_id: hostId, status: 'playing' })
-    .select('*')
-    .single()
-
-  if (error || !room) throw new Error(error?.message ?? '创建房间失败')
-
-  const { error: joinError } = await supabase
-    .from('room_players')
-    .insert({ room_id: room.id, player_id: hostId, score: 0 })
-
-  if (joinError) throw new Error('房主加入房间失败')
-
-  return room as Room
+  const room = await api.insert<Room>('rooms', { room_code, host_id: hostId, status: 'playing' })
+  await api.insert('room_players', { room_id: room.id, player_id: hostId, score: 0 }, 'id')
+  return room
 }
 
 // 加入房间
 export async function joinRoom(roomCode: string, playerId: string): Promise<Room> {
   const code = roomCode.toUpperCase()
-
-  const { data: room, error } = await supabase
-    .from('rooms')
-    .select('*')
-    .eq('room_code', code)
-    .single()
-
-  if (error || !room) throw new Error('房间不存在')
+  const room = await api.one<Room>('rooms', { room_code: code })
   if (room.status === 'settled') throw new Error('该房间已结算，无法加入')
 
-  const { data: existing } = await supabase
-    .from('room_players')
-    .select('id')
-    .eq('room_id', room.id)
-    .eq('player_id', playerId)
-    .maybeSingle()
+  const existing = await api.maybeOne<{ id: string }>('room_players', { room_id: room.id, player_id: playerId }, 'id')
+  if (existing) return room
 
-  if (existing) return room as Room
-
-  const { error: joinError } = await supabase
-    .from('room_players')
-    .insert({ room_id: room.id, player_id: playerId, score: 0 })
-
-  if (joinError) throw new Error('加入房间失败')
-
-  return room as Room
+  await api.insert('room_players', { room_id: room.id, player_id: playerId, score: 0 }, 'id')
+  return room
 }
 
 // 记录一笔转账，同时更新双方净得分
@@ -85,136 +50,60 @@ export async function addTransfer(
   toPlayer: string,
   amount: number
 ): Promise<ScoreTransfer> {
-  // 1. 插入转账记录
-  const { data: transfer, error } = await supabase
-    .from('score_transfers')
-    .insert({
-      room_id: roomId,
-      from_player: fromPlayer,
-      to_player: toPlayer,
-      amount: amount,
-    })
-    .select('*')
-    .single()
+  const transfer = await api.insert<ScoreTransfer>('score_transfers', {
+    room_id: roomId,
+    from_player: fromPlayer,
+    to_player: toPlayer,
+    amount,
+  })
 
-  if (error || !transfer) throw new Error(error?.message ?? '记录转账失败')
+  // 更新输方净得分
+  const fromData = await api.one<{ score: number }>('room_players', { room_id: roomId, player_id: fromPlayer }, 'score')
+  await api.update('room_players', { room_id: roomId, player_id: fromPlayer }, { score: fromData.score - amount }, 'id')
 
-  // 2. 更新输方净得分
-  const { data: fromData } = await supabase
-    .from('room_players')
-    .select('score')
-    .eq('room_id', roomId)
-    .eq('player_id', fromPlayer)
-    .single()
+  // 更新赢方净得分
+  const toData = await api.one<{ score: number }>('room_players', { room_id: roomId, player_id: toPlayer }, 'score')
+  await api.update('room_players', { room_id: roomId, player_id: toPlayer }, { score: toData.score + amount }, 'id')
 
-  const { error: fromError } = await supabase
-    .from('room_players')
-    .update({ score: (fromData?.score ?? 0) - amount })
-    .eq('room_id', roomId)
-    .eq('player_id', fromPlayer)
-
-  if (fromError) throw new Error('更新输方分数失败')
-
-  // 3. 更新赢方净得分
-  const { data: toData } = await supabase
-    .from('room_players')
-    .select('score')
-    .eq('room_id', roomId)
-    .eq('player_id', toPlayer)
-    .single()
-
-  const { error: toError } = await supabase
-    .from('room_players')
-    .update({ score: (toData?.score ?? 0) + amount })
-    .eq('room_id', roomId)
-    .eq('player_id', toPlayer)
-
-  if (toError) throw new Error('更新赢方分数失败')
-
-  return transfer as ScoreTransfer
+  return transfer
 }
 
 // 删除转账记录，回滚双方分数
 export async function deleteTransfer(transferId: string): Promise<void> {
-  const { data: transfer, error: fetchError } = await supabase
-    .from('score_transfers')
-    .select('*')
-    .eq('id', transferId)
-    .single()
-
-  if (fetchError || !transfer) throw new Error('转账记录不存在')
+  const transfer = await api.one<ScoreTransfer>('score_transfers', { id: transferId })
 
   // 回滚输方分数（加回）
-  const { data: fromData } = await supabase
-    .from('room_players')
-    .select('score')
-    .eq('room_id', transfer.room_id)
-    .eq('player_id', transfer.from_player)
-    .single()
-
-  if (fromData) {
-    await supabase
-      .from('room_players')
-      .update({ score: fromData.score + transfer.amount })
-      .eq('room_id', transfer.room_id)
-      .eq('player_id', transfer.from_player)
-  }
+  const fromData = await api.one<{ score: number }>('room_players', { room_id: transfer.room_id, player_id: transfer.from_player }, 'score')
+  await api.update('room_players', { room_id: transfer.room_id, player_id: transfer.from_player }, { score: fromData.score + transfer.amount }, 'id')
 
   // 回滚赢方分数（减掉）
-  const { data: toData } = await supabase
-    .from('room_players')
-    .select('score')
-    .eq('room_id', transfer.room_id)
-    .eq('player_id', transfer.to_player)
-    .single()
+  const toData = await api.one<{ score: number }>('room_players', { room_id: transfer.room_id, player_id: transfer.to_player }, 'score')
+  await api.update('room_players', { room_id: transfer.room_id, player_id: transfer.to_player }, { score: toData.score - transfer.amount }, 'id')
 
-  if (toData) {
-    await supabase
-      .from('room_players')
-      .update({ score: toData.score - transfer.amount })
-      .eq('room_id', transfer.room_id)
-      .eq('player_id', transfer.to_player)
-  }
-
-  const { error } = await supabase
-    .from('score_transfers')
-    .delete()
-    .eq('id', transferId)
-
-  if (error) throw new Error('删除转账失败')
+  await api.remove('score_transfers', { id: transferId })
 }
 
 // 获取房间详情
 export async function getRoomDetail(roomId: string, currentUserId: string): Promise<RoomDetail> {
-  const { data: room, error } = await supabase
-    .from('rooms')
-    .select('*')
-    .eq('id', roomId)
-    .single()
+  const room = await api.one<Room>('rooms', { id: roomId })
 
-  if (error || !room) throw new Error('房间不存在')
+  // 获取玩家列表（带 profile join）
+  const playersRaw = await api.list<any>(
+    'room_players',
+    { room_id: roomId },
+    'id,room_id,player_id,score,joined_at,profile:player_id(nickname,avatar_url)',
+  )
 
-  // 获取玩家列表
-  const { data: players } = await supabase
-    .from('room_players')
-    .select(`
-      id, room_id, player_id, score, joined_at,
-      profile:player_id ( nickname, avatar_url )
-    `)
-    .eq('room_id', roomId)
+  // 获取转账记录（带双向 profile join）
+  const transfersRaw = await api.list<any>(
+    'score_transfers',
+    { room_id: roomId },
+    'id,room_id,from_player,to_player,amount,created_at,from_p:from_player(nickname,avatar_url),to_p:to_player(nickname,avatar_url)',
+    'created_at',
+    false,
+  )
 
-  // 获取转账记录
-  const { data: transfers } = await supabase
-    .from('score_transfers')
-    .select(`
-      id, room_id, from_player, to_player, amount, created_at,
-      from_p:from_player ( nickname, avatar_url ),
-      to_p:to_player ( nickname, avatar_url )
-    `)
-    .eq('room_id', roomId)
-    .order('created_at', { ascending: false })
-
-  const resolvedPlayers: RoomPlayer[] = (players ?? []).map((p: any) => ({
+  const resolvedPlayers: RoomPlayer[] = playersRaw.map((p: any) => ({
     id: p.id,
     room_id: p.room_id,
     player_id: p.player_id,
@@ -223,7 +112,7 @@ export async function getRoomDetail(roomId: string, currentUserId: string): Prom
     profile: p.profile ? { nickname: p.profile.nickname, avatar_url: p.profile.avatar_url } : undefined,
   }))
 
-  const resolvedTransfers: ScoreTransfer[] = (transfers ?? []).map((t: any) => ({
+  const resolvedTransfers: ScoreTransfer[] = transfersRaw.map((t: any) => ({
     id: t.id,
     room_id: t.room_id,
     from_player: t.from_player,
@@ -244,25 +133,17 @@ export async function getRoomDetail(roomId: string, currentUserId: string): Prom
 
 // 按房间码查房间
 export async function getRoomByCode(roomCode: string): Promise<Room | null> {
-  const { data } = await supabase
-    .from('rooms')
-    .select('*')
-    .eq('room_code', roomCode.toUpperCase())
-    .maybeSingle()
-
-  return (data as Room) ?? null
+  return api.maybeOne<Room>('rooms', { room_code: roomCode.toUpperCase() })
 }
 
 // 结算房间
 export async function settleRoom(roomId: string, hostId: string): Promise<void> {
-  const { error } = await supabase
-    .from('rooms')
-    .update({ status: 'settled', settled_at: new Date().toISOString() })
-    .eq('id', roomId)
-    .eq('host_id', hostId)
-    .eq('status', 'playing')
-
-  if (error) throw new Error('结算失败')
+  await api.update(
+    'rooms',
+    { id: roomId, host_id: hostId, status: 'playing' },
+    { status: 'settled', settled_at: new Date().toISOString() },
+    'id',
+  )
 }
 
 // 获取转账汇总（用于结算页）
@@ -273,7 +154,6 @@ export function getTransferSummary(transfers: ScoreTransfer[]): TransferSummary[
     const key = `${t.from_player}->${t.to_player}`
     const reverseKey = `${t.to_player}->${t.from_player}`
     map.set(key, (map.get(key) ?? 0) + t.amount)
-    // 确保反方向 key 存在以计算净额
     if (!map.has(reverseKey)) map.set(reverseKey, 0)
   }
 
@@ -319,31 +199,35 @@ export function getTransferSummary(transfers: ScoreTransfer[]): TransferSummary[
 
 // 获取玩家历史房间
 export async function getRoomHistory(playerId: string): Promise<GameRecord[]> {
-  const { data: participations } = await supabase
-    .from('room_players')
-    .select('room_id, score')
-    .eq('player_id', playerId)
+  const participations = await api.list<{ room_id: string; score: number }>(
+    'room_players',
+    { player_id: playerId },
+    'room_id,score',
+  )
 
-  if (!participations) return []
+  if (!participations.length) return []
 
   const roomIds = participations.map(p => p.room_id)
+  const rooms = await api.listIn<Room>(
+    'rooms',
+    'id',
+    roomIds,
+    { status: 'settled' },
+    '*',
+    'settled_at',
+    false,
+  )
 
-  const { data: rooms } = await supabase
-    .from('rooms')
-    .select('*')
-    .in('id', roomIds)
-    .eq('status', 'settled')
-    .order('settled_at', { ascending: false })
-
-  if (!rooms) return []
+  if (!rooms.length) return []
 
   const records: GameRecord[] = []
 
   for (const room of rooms) {
-    const { data: roomPlayers } = await supabase
-      .from('room_players')
-      .select('score, profile:player_id ( nickname, avatar_url )')
-      .eq('room_id', room.id)
+    const roomPlayers = await api.list<any>(
+      'room_players',
+      { room_id: room.id },
+      'score,profile:player_id(nickname,avatar_url)',
+    )
 
     const myParticipation = participations.find(p => p.room_id === room.id)
 
@@ -353,7 +237,7 @@ export async function getRoomHistory(playerId: string): Promise<GameRecord[]> {
       created_at: room.created_at,
       settled_at: room.settled_at,
       my_score: myParticipation?.score ?? 0,
-      players: (roomPlayers ?? []).map((p: any) => ({
+      players: roomPlayers.map((p: any) => ({
         nickname: p.profile?.nickname ?? '未知',
         avatar_url: p.profile?.avatar_url ?? '',
         score: p.score,
@@ -369,10 +253,5 @@ export async function updateProfile(
   playerId: string,
   data: { nickname?: string; avatar_url?: string }
 ): Promise<void> {
-  const { error } = await supabase
-    .from('profiles')
-    .update(data)
-    .eq('id', playerId)
-
-  if (error) throw new Error(error.message ?? '更新资料失败')
+  await api.update('profiles', { id: playerId }, data as Record<string, string>, 'id')
 }
