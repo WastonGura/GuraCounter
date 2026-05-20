@@ -1,9 +1,0 @@
-{
-  "permissions": {
-    "allow": [
-      "Bash(Get-ChildItem -Recurse -Depth 0 -Name d:\\\\Document\\\\WechatMiniProject\\\\GuraCounter\\\\src)",
-      "Bash(Get-ChildItem -Path \"d:\\\\Document\\\\WechatMiniProject\\\\GuraCounter\" -Depth 1 -Directory)",
-      "Bash(Select-Object FullName)"
-    ]
-  }
-}
