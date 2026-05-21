@@ -4,11 +4,9 @@ import type { Room, RoomDetail, RoomPlayer, ScoreTransfer, GameRecord, TransferS
 // 生成6位房间码（排除易混淆字符 0/O/1/I/L）
 function generateRoomCode(): string {
   const CHARS = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789'
-  const array = new Uint8Array(6)
-  crypto.getRandomValues(array)
   let code = ''
   for (let i = 0; i < 6; i++) {
-    code += CHARS[array[i] % CHARS.length]
+    code += CHARS[Math.floor(Math.random() * CHARS.length)]
   }
   return code
 }
