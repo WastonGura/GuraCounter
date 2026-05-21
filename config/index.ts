@@ -1,5 +1,11 @@
 import path from 'path'
+import dotenv from 'dotenv'
 import { defineConfig, type UserConfigExport } from '@tarojs/cli'
+
+// 手动加载 .env 文件到 process.env，因为 Taro 的 dotenvParse 只加载 TARO_APP_ 前缀的变量
+const envMode = process.env.NODE_ENV === 'production' ? 'production' : 'development'
+dotenv.config({ path: path.resolve(__dirname, '../.env'), override: false })
+dotenv.config({ path: path.resolve(__dirname, `../.env.${envMode}`), override: true })
 
 import devConfig from './dev'
 import prodConfig from './prod'
@@ -27,6 +33,7 @@ export default defineConfig<'vite'>(async (merge, {  }) => {
     defineConstants: {
       'process.env.VITE_SUPABASE_URL': JSON.stringify(process.env.VITE_SUPABASE_URL || ''),
       'process.env.VITE_SUPABASE_ANON_KEY': JSON.stringify(process.env.VITE_SUPABASE_ANON_KEY || ''),
+      'process.env.TARO_APP_CLOUD_ENV': JSON.stringify(process.env.TARO_APP_CLOUD_ENV || ''),
     },
     copy: {
       patterns: [
@@ -45,9 +52,9 @@ export default defineConfig<'vite'>(async (merge, {  }) => {
           }
         },
         cssModules: {
-          enable: false, // 默认为 false，如需使用 css modules 功能，则设为 true
+          enable: false,
           config: {
-            namingPattern: 'module', // 转换模式，取值为 global/module
+            namingPattern: 'module',
             generateScopedName: '[name]__[local]___[hash:base64:5]'
           }
         }
@@ -68,9 +75,9 @@ export default defineConfig<'vite'>(async (merge, {  }) => {
           config: {}
         },
         cssModules: {
-          enable: false, // 默认为 false，如需使用 css modules 功能，则设为 true
+          enable: false,
           config: {
-            namingPattern: 'module', // 转换模式，取值为 global/module
+            namingPattern: 'module',
             generateScopedName: '[name]__[local]___[hash:base64:5]'
           }
         }
@@ -80,7 +87,7 @@ export default defineConfig<'vite'>(async (merge, {  }) => {
       appName: 'taroDemo',
       postcss: {
         cssModules: {
-          enable: false, // 默认为 false，如需使用 css modules 功能，则设为 true
+          enable: false,
         }
       }
     }
@@ -88,9 +95,7 @@ export default defineConfig<'vite'>(async (merge, {  }) => {
 
 
   if (process.env.NODE_ENV === 'development') {
-    // 本地开发构建配置（不混淆压缩）
     return merge({}, baseConfig, devConfig)
   }
-  // 生产构建配置（默认开启压缩混淆等）
   return merge({}, baseConfig, prodConfig)
 })

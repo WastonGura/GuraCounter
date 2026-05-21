@@ -38,7 +38,6 @@
   "author": "",
   "dependencies": {
     "@babel/runtime": "^7.24.4",
-    "@supabase/supabase-js": "^2.105.4",
     "@tarojs/components": "4.2.0",
     "@tarojs/helper": "4.2.0",
     "@tarojs/plugin-framework-react": "4.2.0",
@@ -56,7 +55,7 @@
     "@tarojs/taro": "4.2.0",
     "react": "^18.0.0",
     "react-dom": "^18.0.0",
-    "zustand": "^5.0.13"
+    "zustand": "^4.5.5"
   },
   "devDependencies": {
     "@babel/core": "^7.24.4",
