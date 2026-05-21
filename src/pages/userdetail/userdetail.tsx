@@ -86,9 +86,6 @@ const UserDetail = () => {
     setNickname(user?.nickname ?? '')
   }
 
-  // 统计
-  const totalScore = records.reduce((sum, r) => sum + r.my_score, 0)
-
   return (
     <View className='userdetail-container'>
       {/* 用户信息 */}
@@ -128,14 +125,15 @@ const UserDetail = () => {
         </View>
 
         <View className='userdetail-info-rate'>
-          <Text>参与房间：{records.length}</Text>
-          <Text>总净得分：{totalScore > 0 ? '+' : ''}{totalScore}</Text>
+          <Text>赢：{records.filter(r => r.my_score > 0).length}</Text>
+          <Text>输：{records.filter(r => r.my_score < 0).length}</Text>
+          <Text>胜率：{records.length > 0 ? ((records.filter(r => r.my_score > 0).length - records.filter(r => r.my_score < 0).length) / records.length * 100).toFixed(2) + '%' : '0%'}</Text>
         </View>
       </View>
 
-      {/* 历史战绩 */}
+      {/* 战绩 */}
       <View className='userdetail-history'>
-        <Text className='history-title'>历史战绩</Text>
+        <Text className='history-title'>战绩</Text>
 
         {loading ? (
           <Text className='history-empty'>加载中...</Text>
