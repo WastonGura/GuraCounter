@@ -41,18 +41,48 @@ const UserDetail = () => {
   // 更换头像
   const handleAvatarClick = async () => {
     await Taro.vibrateShort({ type: 'light' })
+    if (!user) return
+
     try {
-      const res = await Taro.chooseImage({
+      const res = await Taro.chooseMedia({
         count: 1,
+        mediaType: ['image'],
         sizeType: ['compressed'],
         sourceType: ['album', 'camera'],
       })
-      if (res.tempFilePaths.length > 0) {
-        // 微信小程序头像更新（此处仅提示，实际上传需要云存储）
-        Taro.showToast({ title: '头像更新功能待开放', icon: 'none' })
+      if (res.tempFiles.length > 0) {
+        // 裁剪为 1:1 头像比例
+        const cropRes = await Taro.cropImage({
+          src: res.tempFiles[0].tempFilePath,
+          cropScale: '1:1',
+        })
+
+        Taro.showLoading({ title: '上传中...' })
+
+        // 删除旧的头像文件
+        if (user.avatar_url?.startsWith('cloud://')) {
+          Taro.cloud.deleteFile({ fileList: [user.avatar_url] }).catch(() => {})
+        }
+
+        const cloudPath = `avatars/${user.id}_${Date.now()}.jpg`
+
+        const uploadRes = await Taro.cloud.uploadFile({
+          cloudPath,
+          filePath: cropRes.tempFilePath,
+        })
+
+        await updateProfile(user.id, { avatar_url: uploadRes.fileID })
+        const updated = { ...user, avatar_url: uploadRes.fileID }
+        Taro.setStorageSync('user_profile', updated)
+        setUser(updated)
+
+        Taro.hideLoading()
+        Taro.showToast({ title: '修改成功', icon: 'success' })
       }
-    } catch {
-      // 用户取消选择
+    } catch (e: any) {
+      Taro.hideLoading()
+      if (e.errMsg?.includes('cancel')) return
+      Taro.showToast({ title: '修改失败', icon: 'error' })
     }
   }
 
