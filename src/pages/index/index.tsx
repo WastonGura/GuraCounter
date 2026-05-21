@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { View, Text, Image, Button } from '@tarojs/components'
+import { View, Text, Image, Button, ScrollView } from '@tarojs/components'
 import Taro from '@tarojs/taro'
 import { loginAndRegister } from '@/utils/auth'
 import { createRoom, joinRoom } from '@/services/room'
@@ -11,6 +11,7 @@ const Index = () => {
   const [creating, setCreating] = useState(false)
   const [joining, setJoining] = useState(false)
   const [showJoinModal, setShowJoinModal] = useState(false)
+  const [refreshing, setRefreshing] = useState(false)
 
   const avatarDefault = 'https://mmbiz.qpic.cn/mmbiz/icTdbqWNOwNRna42FI242Lcia07jQodd2FJGIYQfG0LAJGFxM4FbnQP6yfMxBgJ0F3YRqJCJ1aPAK2dQagdusBZg/0'
 
@@ -21,6 +22,13 @@ const Index = () => {
     }
     initAuth()
   }, [])
+
+  const handleRefresh = () => {
+    setRefreshing(true)
+    const cached = Taro.getStorageSync('user_profile')
+    if (cached) setUser(cached)
+    setTimeout(() => setRefreshing(false), 300)
+  }
 
   async function handleLogin() {
     const profile = await loginAndRegister()
@@ -39,7 +47,7 @@ const Index = () => {
   // 进入个人中心
   const handleAvatarClick = async () => {
     await Taro.vibrateShort({ type: 'light' })
-    // if (!requireLogin()) return
+    if (!requireLogin()) return
     Taro.navigateTo({ url: '/pages/userdetail/userdetail' })
   }
 
@@ -87,7 +95,12 @@ const Index = () => {
   }
 
   return (
-    <View className='index-container'>
+    <ScrollView
+      className='index-container'
+      refresherEnabled
+      refresherTriggered={refreshing}
+      onRefresherRefresh={handleRefresh}
+    >
       <View className='user'>
         <Image
           className='avatar-img'
@@ -115,7 +128,7 @@ const Index = () => {
         <Text className='contact'>email: <Text className='email'>jiker@gmail.com</Text></Text>
         <Text className='studio'>© 2026 小古拉工作室</Text>
       </View>
-    </View>
+    </ScrollView>
   )
 }
 
