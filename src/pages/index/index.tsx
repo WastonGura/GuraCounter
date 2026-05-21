@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { View, Text, Image, Button, ScrollView } from '@tarojs/components'
-import Taro from '@tarojs/taro'
+import Taro, { useDidShow } from '@tarojs/taro'
 import { loginAndRegister } from '@/utils/auth'
 import { createRoom, joinRoom } from '@/services/room'
 import JoinRoom from '@/components/JoinRoom'
@@ -12,8 +12,15 @@ const Index = () => {
   const [joining, setJoining] = useState(false)
   const [showJoinModal, setShowJoinModal] = useState(false)
   const [refreshing, setRefreshing] = useState(false)
+  const [roomInfo, setRoomInfo] = useState<{ roomId: string; roomCode: string } | null>(null)
 
   const avatarDefault = 'https://mmbiz.qpic.cn/mmbiz/icTdbqWNOwNRna42FI242Lcia07jQodd2FJGIYQfG0LAJGFxM4FbnQP6yfMxBgJ0F3YRqJCJ1aPAK2dQagdusBZg/0'
+
+  //查询用户有没有处于房间中
+  const checkCurrentRoom = () => {
+    const room = Taro.getStorageSync('current_room')
+    setRoomInfo(room || null)
+  }
 
   useEffect(() => {
     async function initAuth() {
@@ -21,12 +28,18 @@ const Index = () => {
       if (profile) setUser(profile)
     }
     initAuth()
+    checkCurrentRoom()
   }, [])
+
+  useDidShow(() => {
+    checkCurrentRoom()
+  })
 
   const handleRefresh = () => {
     setRefreshing(true)
     const cached = Taro.getStorageSync('user_profile')
     if (cached) setUser(cached)
+    checkCurrentRoom()
     setTimeout(() => setRefreshing(false), 300)
   }
 
@@ -55,11 +68,13 @@ const Index = () => {
   const handleCreateRoom = async () => {
     await Taro.vibrateShort({ type: 'light' })
     if (!requireLogin()) return
+    if (roomInfo) return Taro.showToast({ title: '正在游戏中，无法创建新房间', icon: 'error' })
     if (creating) return
 
     setCreating(true)
     try {
       const room = await createRoom(user.id)
+      Taro.setStorageSync('current_room', { roomId: room.id, roomCode: room.room_code })
       Taro.navigateTo({ url: `/pages/room/room?roomId=${room.id}` })
     } catch (e: any) {
       Taro.showToast({ title: e.message ?? '创建失败', icon: 'error' })
@@ -72,6 +87,7 @@ const Index = () => {
   const handleJoinRoom = async () => {
     await Taro.vibrateShort({ type: 'light' })
     if (!requireLogin()) return
+    if (roomInfo) return Taro.showToast({ title: '正在游戏中，无法加入房间', icon: 'error' })
     setShowJoinModal(true)
   }
 
@@ -82,6 +98,7 @@ const Index = () => {
     try {
       const room = await joinRoom(roomCode, user.id)
       setShowJoinModal(false)
+      Taro.setStorageSync('current_room', { roomId: room.id, roomCode: room.room_code })
       Taro.navigateTo({ url: `/pages/room/room?roomId=${room.id}` })
     } catch (e: any) {
       Taro.showToast({ title: e.message ?? '加入失败', icon: 'error' })
@@ -92,6 +109,12 @@ const Index = () => {
 
   const handleCancelJoin = () => {
     setShowJoinModal(false)
+  }
+
+  const handleBackRoom = async () => {
+    await Taro.vibrateShort({ type: 'light' })
+    if (!roomInfo) return
+    Taro.navigateTo({ url: `/pages/room/room?roomId=${roomInfo.roomId}` })
   }
 
   return (
@@ -115,6 +138,13 @@ const Index = () => {
       <View className='buttons'>
         <Button className='createbutton' onClick={handleCreateRoom} loading={creating} disabled={creating}>创建房间</Button>
         <Button className='joinbutton' onClick={handleJoinRoom}>加入房间</Button>
+        {roomInfo && (
+          <View className='room-card' onClick={handleBackRoom}>
+            <Text className='room-card-title'>当前房间</Text>
+            <Text className='room-card-code'>房间码：{roomInfo?.roomCode}</Text>
+            <Text className='room-card-hint'>点击返回</Text>
+          </View>
+        )}
       </View>
 
       <JoinRoom

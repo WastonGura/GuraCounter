@@ -107,6 +107,7 @@ const Room = () => {
     if (!res.confirm) return
     try {
       await settleRoom(room.id, currentUser.id)
+      Taro.removeStorageSync('current_room')
       Taro.showToast({ title: '结算成功', icon: 'success' })
       fetchRoom()
     } catch (e: any) {
