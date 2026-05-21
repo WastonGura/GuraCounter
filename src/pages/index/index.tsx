@@ -1,114 +1,97 @@
-import { View , Text, Image, Button} from '@tarojs/components'
-import './index.scss'
 import { useState, useEffect } from 'react'
-import avatarDefault from '../../assets/images/avatar.png'
+import { View, Text, Image, Button } from '@tarojs/components'
 import Taro from '@tarojs/taro'
 import { loginAndRegister } from '@/utils/auth'
+import { createRoom, joinRoom } from '@/services/room'
+import JoinRoom from '@/components/JoinRoom'
+import './index.scss'
 
 const Index = () => {
   const [user, setUser] = useState<any>(null)
+  const [creating, setCreating] = useState(false)
+  const [joining, setJoining] = useState(false)
+  const [showJoinModal, setShowJoinModal] = useState(false)
+
+  const avatarDefault = 'https://mmbiz.qpic.cn/mmbiz/icTdbqWNOwNRna42FI242Lcia07jQodd2FJGIYQfG0LAJGFxM4FbnQP6yfMxBgJ0F3YRqJCJ1aPAK2dQagdusBZg/0'
 
   useEffect(() => {
     async function initAuth() {
       const profile = await loginAndRegister()
-      if (profile) {
-        setUser(profile)
-      }
+      if (profile) setUser(profile)
     }
-
     initAuth()
   }, [])
 
   async function handleLogin() {
     const profile = await loginAndRegister()
-    if (profile) {
-      setUser(profile)
+    if (profile) setUser(profile)
+  }
+
+  const requireLogin = (): boolean => {
+    if (!user) {
+      Taro.showToast({ title: '请先登录', icon: 'none' })
+      handleLogin()
+      return false
     }
+    return true
   }
 
   // 进入个人中心
-  const handleAvatarClick = async() => {
-    // 震动反馈
-    await Taro.vibrateShort({
-      type: 'light'
-    })
-
-    // 如果用户未登录，提示登录
-    if (!user) {
-      Taro.showToast({
-        title: '请先登录',
-        icon: 'none'
-      })
-      handleLogin()
-      return
-    }
-
-    // 如果用户已登录，进入个人中心
-    Taro.navigateTo({
-      url: '/pages/userdetail/userdetail'
-    })
+  const handleAvatarClick = async () => {
+    await Taro.vibrateShort({ type: 'light' })
+    if (!requireLogin()) return
+    Taro.navigateTo({ url: '/pages/userdetail/userdetail' })
   }
 
   // 创建房间
-  const handleCreateRoom = async() => {
-    // 震动反馈
-    await Taro.vibrateShort({
-      type: 'light'
-    })
+  const handleCreateRoom = async () => {
+    await Taro.vibrateShort({ type: 'light' })
+    if (!requireLogin()) return
+    if (creating) return
 
-    // 如果用户未登录，提示登录
-    if (!user) {
-      Taro.showToast({
-        title: '请先登录',
-        icon: 'none'
-      })
-      handleLogin()
-      return
+    setCreating(true)
+    try {
+      const room = await createRoom(user.id)
+      Taro.navigateTo({ url: `/pages/room/room?roomId=${room.id}` })
+    } catch (e: any) {
+      Taro.showToast({ title: e.message ?? '创建失败', icon: 'error' })
+    } finally {
+      setCreating(false)
     }
-
-    // 如果用户已登录，创建并进入房间页面
-    async function createRoom() {}
-
-    createRoom()
-
-    Taro.navigateTo({
-      url: '/pages/room/room'
-    })
   }
 
   // 加入房间
-  const handleJoinRoom = async() => {
-    // 震动反馈
-    await Taro.vibrateShort({
-      type: 'light'
-    })
+  const handleJoinRoom = async () => {
+    await Taro.vibrateShort({ type: 'light' })
+    if (!requireLogin()) return
+    setShowJoinModal(true)
+  }
 
-    // 如果用户未登录，提示登录
-    if (!user) {
-      Taro.showToast({
-        title: '请先登录',
-        icon: 'none'
-      })
-      handleLogin()
-      return
+  const handleConfirmJoin = async (roomCode: string) => {
+    if (joining) return
+
+    setJoining(true)
+    try {
+      const room = await joinRoom(roomCode, user.id)
+      setShowJoinModal(false)
+      Taro.navigateTo({ url: `/pages/room/room?roomId=${room.id}` })
+    } catch (e: any) {
+      Taro.showToast({ title: e.message ?? '加入失败', icon: 'error' })
+    } finally {
+      setJoining(false)
     }
+  }
 
-    // 如果用户已登录，输入房间号或扫描二维码加入房间
-    async function joinRoom() {}
-
-    joinRoom()
-
-    Taro.navigateTo({
-      url: '/pages/room/room'
-    })
+  const handleCancelJoin = () => {
+    setShowJoinModal(false)
   }
 
   return (
     <View className='index-container'>
       <View className='user'>
-        <Image 
+        <Image
           className='avatar-img'
-          src={user?.avatarUrl || avatarDefault} 
+          src={user?.avatar_url || avatarDefault}
           onClick={handleAvatarClick}
         />
         <Text className='username'>
@@ -117,15 +100,20 @@ const Index = () => {
       </View>
 
       <View className='buttons'>
-        <Button className='createbutton' onClick={handleCreateRoom}>创建房间</Button>
+        <Button className='createbutton' onClick={handleCreateRoom} loading={creating} disabled={creating}>创建房间</Button>
         <Button className='joinbutton' onClick={handleJoinRoom}>加入房间</Button>
       </View>
+
+      <JoinRoom
+        visible={showJoinModal}
+        onConfirm={handleConfirmJoin}
+        onCancel={handleCancelJoin}
+      />
 
       <View className='footer'>
         <Text className='blessing'>好运连连~</Text>
         <Text className='studio'>© 2026 小古拉工作室</Text>
       </View>
-
     </View>
   )
 }

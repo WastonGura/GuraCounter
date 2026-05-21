@@ -1,19 +1,43 @@
 .history-card-container {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
   padding: 28rpx 32rpx;
   margin-bottom: 16rpx;
   background-color: #fff;
   border-radius: 20rpx;
 
-  .history-card-date {
-    font-size: 28rpx;
+  .history-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16rpx;
+  }
+
+  .history-card-code {
+    font-size: 30rpx;
+    font-weight: 500;
     color: #333;
   }
 
-  .history-card-result {
-    font-size: 28rpx;
-    font-weight: 500;
+  .history-card-date {
+    font-size: 24rpx;
+    color: #999;
+  }
+
+  .history-card-score {
+    font-size: 34rpx;
+    font-weight: bold;
+
+    &.positive { color: #07c160; }
+    &.negative { color: #ee0a24; }
+  }
+
+  .history-card-players {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12rpx 24rpx;
+
+    .player-score-text {
+      font-size: 24rpx;
+      color: #666;
+    }
   }
 }

@@ -1,3 +1,3 @@
 export default definePageConfig({
-  navigationBarTitleText: 'GuraCounter',
+  navigationBarTitleText: '小古拉计分',
 })
