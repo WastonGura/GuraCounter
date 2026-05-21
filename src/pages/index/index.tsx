@@ -39,7 +39,7 @@ const Index = () => {
   // 进入个人中心
   const handleAvatarClick = async () => {
     await Taro.vibrateShort({ type: 'light' })
-    if (!requireLogin()) return
+    // if (!requireLogin()) return
     Taro.navigateTo({ url: '/pages/userdetail/userdetail' })
   }
 
@@ -112,6 +112,7 @@ const Index = () => {
 
       <View className='footer'>
         <Text className='blessing'>好运连连~</Text>
+        <Text className='contact'>email: <Text className='email'>jiker@gmail.com</Text></Text>
         <Text className='studio'>© 2026 小古拉工作室</Text>
       </View>
     </View>
