@@ -44,6 +44,9 @@ export default defineConfig<'vite'>(async (merge, {  }) => {
     framework: 'react',
     compiler: 'vite',
     mini: {
+      imageUrlLoaderOption: {
+        limit: 1024, // 超过1KB的图片不走base64内联，避免src过长警告
+      },
       postcss: {
         pxtransform: {
           enable: true,
