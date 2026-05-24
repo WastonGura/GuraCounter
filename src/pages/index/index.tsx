@@ -118,47 +118,49 @@ const Index = () => {
   }
 
   return (
-    <ScrollView
-      className='index-container'
-      refresherEnabled
-      refresherTriggered={refreshing}
-      onRefresherRefresh={handleRefresh}
-    >
-      <View className='user'>
-        <Image
-          className='avatar-img'
-          src={user?.avatar_url || avatarDefault}
-          onClick={handleAvatarClick}
-        />
-        <Text className='username'>
-          {user?.nickname || '小古拉'}
-        </Text>
-      </View>
+    <View className='index-page'>
+      <ScrollView
+        className='index-container'
+        refresherEnabled
+        refresherTriggered={refreshing}
+        onRefresherRefresh={handleRefresh}
+      >
+        <View className='user'>
+          <Image
+            className='avatar-img'
+            src={user?.avatar_url || avatarDefault}
+            onClick={handleAvatarClick}
+          />
+          <Text className='username'>
+            {user?.nickname || '小古拉'}
+          </Text>
+        </View>
 
-      <View className='buttons'>
-        <Button className='createbutton' onClick={handleCreateRoom} loading={creating} disabled={creating}>创建房间</Button>
-        <Button className='joinbutton' onClick={handleJoinRoom}>加入房间</Button>
-        {roomInfo && (
-          <View className='room-card' onClick={handleBackRoom}>
-            <Text className='room-card-title'>当前房间</Text>
-            <Text className='room-card-code'>房间码：{roomInfo?.roomCode}</Text>
-            <Text className='room-card-hint'>点击返回</Text>
-          </View>
-        )}
-      </View>
+        <View className='buttons'>
+          <Button className='createbutton' onClick={handleCreateRoom} loading={creating} disabled={creating}>创建房间</Button>
+          <Button className='joinbutton' onClick={handleJoinRoom}>加入房间</Button>
+          {roomInfo && (
+            <View className='room-card' onClick={handleBackRoom}>
+              <Text className='room-card-title'>当前房间</Text>
+              <Text className='room-card-code'>房间码：{roomInfo?.roomCode}</Text>
+              <Text className='room-card-hint'>点击返回</Text>
+            </View>
+          )}
+        </View>
+
+        <View className='footer'>
+          <Text className='blessing'>好运连连~</Text>
+          <Text className='contact'>email: <Text className='email'>jiker@gmail.com</Text></Text>
+          <Text className='studio'>© 2026 小古拉工作室</Text>
+        </View>
+      </ScrollView>
 
       <JoinRoom
         visible={showJoinModal}
         onConfirm={handleConfirmJoin}
         onCancel={handleCancelJoin}
       />
-
-      <View className='footer'>
-        <Text className='blessing'>好运连连~</Text>
-        <Text className='contact'>email: <Text className='email'>jiker@gmail.com</Text></Text>
-        <Text className='studio'>© 2026 小古拉工作室</Text>
-      </View>
-    </ScrollView>
+    </View>
   )
 }
 
