@@ -1,8 +1,8 @@
 export default defineAppConfig({
   pages: [
+    'pages/room/room',
     'pages/index/index',
     'pages/check/check',
-    'pages/room/room',
     'pages/userdetail/userdetail'
   ],
   window: {

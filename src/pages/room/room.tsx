@@ -1,21 +1,54 @@
-import { View, Text, Button, Picker, Input } from '@tarojs/components'
+import { View, Text, Button, Image } from '@tarojs/components'
 import Taro, { useRouter, useDidShow } from '@tarojs/taro'
 import { useEffect, useState, useRef } from 'react'
 import { getRoomDetail, addTransfer as addTransferService, deleteTransfer, settleRoom } from '@/services/room'
 import { useRoomStore } from '@/stores/room'
 import { getCurrentUser } from '@/utils/auth'
-import type { RoomPlayer } from '@/types/game'
+import type { RoomPlayer, RoomDetail } from '@/types/game'
+import checkIcon from '@/assets/icons/check.svg'
+import historyIcon from '@/assets/icons/history.svg'
+import PlayerCard from '@/components/PlayerCard'
+import InviteCard from '@/components/InviteCard'
+import TransferCard from '@/components/TransferCard'
+import './room.scss'
+
+// 开发模式：设为 true 直接预览 room 页面 UI，无需登录和创建房间
+const DEV_MOCK = true
+
+const MOCK_ROOM: RoomDetail = {
+  id: 'mock-room-1',
+  room_code: 'ABC123',
+  host_id: 'player-1',
+  status: 'playing',
+  created_at: new Date().toISOString(),
+  settled_at: null,
+  is_host: true,
+  players: [
+    { id: 'rp-1', room_id: 'mock-room-1', player_id: 'player-1', score: 150, joined_at: '', profile: { nickname: '小明', avatar_url: '' } },
+    { id: 'rp-2', room_id: 'mock-room-1', player_id: 'player-2', score: -60, joined_at: '', profile: { nickname: '小红', avatar_url: '' } },
+    { id: 'rp-3', room_id: 'mock-room-1', player_id: 'player-3', score: -90, joined_at: '', profile: { nickname: '小刚', avatar_url: '' } },
+  ],
+  transfers: [
+    { id: 't-1', room_id: 'mock-room-1', from_player: 'player-2', to_player: 'player-1', amount: 100, created_at: '', from_profile: { nickname: '小红', avatar_url: '' }, to_profile: { nickname: '小明', avatar_url: '' } },
+    { id: 't-2', room_id: 'mock-room-1', from_player: 'player-3', to_player: 'player-1', amount: 50, created_at: '', from_profile: { nickname: '小刚', avatar_url: '' }, to_profile: { nickname: '小明', avatar_url: '' } },
+  ],
+}
+
+const getMockCurrentUser = () => ({ id: 'player-1', nickname: '小明', avatar_url: '' })
+const avatarDefault = 'https://mmbiz.qpic.cn/mmbiz/icTdbqWNOwNRna42FI242Lcia07jQodd2FJGIYQfG0LAJGFxM4FbnQP6yfMxBgJ0F3YRqJCJ1aPAK2dQagdusBZg/0'
 
 const Room = () => {
   const router = useRouter()
-  const roomId = router.params.roomId as string
-  const currentUser = getCurrentUser()
+  const roomId = DEV_MOCK ? 'mock-room-1' : (router.params.roomId as string)
+  const currentUser = DEV_MOCK ? getMockCurrentUser() : getCurrentUser()
   const { room, isHost, loading, setRoom, setLoading, addTransfer, removeTransfer, updatePlayerScore, clearRoom } = useRoomStore()
 
-  // 转账表单
-  const [fromIndex, setFromIndex] = useState(0)
-  const [toIndex, setToIndex] = useState(0)
-  const [amount, setAmount] = useState('')
+  // 底部标签页切换
+  const [activeTab, setActiveTab] = useState<'transfer' | 'history'>('transfer')
+
+  // 转账弹窗
+  const [transferTarget, setTransferTarget] = useState<RoomPlayer | null>(null)
+  const [transferAmount, setTransferAmount] = useState('')
   const [submitting, setSubmitting] = useState(false)
 
   const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null)
@@ -36,6 +69,10 @@ const Room = () => {
   }
 
   useEffect(() => {
+    if (DEV_MOCK) {
+      setRoom(MOCK_ROOM, true)
+      return () => clearRoom()
+    }
     setLoading(true)
     fetchRoom().then(startPolling)
     return () => {
@@ -46,39 +83,52 @@ const Room = () => {
 
   // 页面从其他页面返回时刷新
   useDidShow(() => {
+    if (DEV_MOCK) return
     if (roomId) fetchRoom()
   })
 
   // 复制房间码
-  const handleCopyCode = async () => {
-    if (!room) return
+  // const handleCopyCode = async () => {
+  //   if (!room) return
+  //   await Taro.vibrateShort({ type: 'light' })
+  //   Taro.setClipboardData({ data: room.room_code })
+  //   Taro.showToast({ title: '房间码已复制', icon: 'success' })
+  // }
+
+  // 进入个人中心
+  const handleAvatarClick = async () => {
     await Taro.vibrateShort({ type: 'light' })
-    Taro.setClipboardData({ data: room.room_code })
-    Taro.showToast({ title: '房间码已复制', icon: 'success' })
+    Taro.navigateTo({ url: '/pages/userdetail/userdetail' })
   }
 
-  // 添加转账
+  // 点击玩家卡 → 弹出转账弹窗
+  const handleCardClick = async (player: RoomPlayer) => {
+    await Taro.vibrateShort({ type: 'light' })
+    setTransferTarget(player)
+    setTransferAmount('')
+  }
+
+  // 确认转账
   const handleAddTransfer = async () => {
-    if (!room || !currentUser) return
-    const amt = parseInt(amount)
+    if (!room || !currentUser || !transferTarget) return
+    const amt = parseInt(transferAmount)
     if (!amt || amt <= 0) {
       Taro.showToast({ title: '请输入有效金额', icon: 'error' })
       return
     }
-    const players = room.players
-    if (fromIndex === toIndex) {
-      Taro.showToast({ title: '输方和赢方不能相同', icon: 'error' })
+    if (transferTarget.player_id === currentUser.id) {
+      Taro.showToast({ title: '不能给自己转账', icon: 'error' })
       return
     }
 
     setSubmitting(true)
     try {
-      const transfer = await addTransferService(room.id, players[fromIndex].player_id, players[toIndex].player_id, amt)
+      const transfer = await addTransferService(room.id, currentUser.id, transferTarget.player_id, amt)
       addTransfer(transfer)
-      // 更新本地双方分数
-      updatePlayerScore(players[fromIndex].player_id, players[fromIndex].score - amt)
-      updatePlayerScore(players[toIndex].player_id, players[toIndex].score + amt)
-      setAmount('')
+      updatePlayerScore(currentUser.id, (room.players.find(p => p.player_id === currentUser.id)?.score ?? 0) - amt)
+      updatePlayerScore(transferTarget.player_id, transferTarget.score + amt)
+      setTransferTarget(null)
+      setTransferAmount('')
       Taro.showToast({ title: '记录成功', icon: 'success' })
     } catch (e: any) {
       Taro.showToast({ title: e.message ?? '记录失败', icon: 'error' })
@@ -100,9 +150,16 @@ const Room = () => {
     }
   }
 
+  // 切换标签
+  const handleTabSwitch = async (tab: 'transfer' | 'history') => {
+    await Taro.vibrateShort({ type: 'light' })
+    setActiveTab(tab)
+  }
+
   // 结算
   const handleSettle = async () => {
     if (!room || !currentUser) return
+    await Taro.vibrateShort({ type: 'light' })
     const res = await Taro.showModal({ title: '确认结算', content: '结算后无法再修改分数，确定吗？' })
     if (!res.confirm) return
     try {
@@ -134,118 +191,111 @@ const Room = () => {
 
   const players = room.players
   const isSettled = room.status === 'settled'
-  const playerNames = players.map(p => p.profile?.nickname ?? '未知')
+  // const playerNames = players.map(p => p.profile?.nickname ?? '未知')
 
   return (
     <View className='room-container'>
-      {/* 房间码 */}
-      <View className='room-code-bar' onClick={handleCopyCode}>
-        <Text className='room-code-label'>房间码</Text>
-        <Text className='room-code-value'>{room.room_code}</Text>
-        <Text className='room-code-hint'>点击复制</Text>
+      <View className='room-header'>
+        <View className='user'>
+          <Image
+            className='avatar'
+            src={currentUser?.avatar_url || avatarDefault}
+            onClick={handleAvatarClick}
+          />
+          <Text className='username'>
+            {currentUser?.nickname || '小古拉'}
+          </Text>
+        </View>
+
+        <Text className="score">分数:{players.find(p => p.player_id === currentUser?.id)?.score ?? 0}</Text>
+
+        <Button className='settle-btn' onClick={handleSettle}>结算</Button>
       </View>
 
-      {/* 状态标签 */}
-      {isSettled && <View className='settled-badge'><Text>已结算</Text></View>}
-
-      {/* 玩家列表 */}
-      <View className='player-section'>
-        <Text className='section-title'>玩家 ({players.length}人)</Text>
-        {players.map((p: RoomPlayer) => (
-          <View key={p.player_id} className='player-card'>
-            <Text className='player-name'>{p.profile?.nickname ?? '未知'}</Text>
-            <Text className={`player-score ${p.score > 0 ? 'positive' : p.score < 0 ? 'negative' : ''}`}>
-              {p.score > 0 ? '+' : ''}{p.score}
-            </Text>
+      <View className='room-body'>
+        {activeTab === 'transfer' && (
+          <View className='tab-content'>
+            <View className='player-list'>
+              {players.filter(p => p.player_id !== currentUser?.id).map(p => (
+                <PlayerCard
+                  key={p.id}
+                  player={p}
+                  avatarDefault={avatarDefault}
+                  onClick={() => handleCardClick(p)}
+                />
+              ))}
+              <InviteCard roomCode={room.room_code} />
+            </View>
           </View>
-        ))}
+        )}
+        {activeTab === 'history' && (
+          <View className='tab-content'>
+            <View className='player-list'>
+              {room.transfers.map(t => (
+                <TransferCard
+                  key={t.id}
+                  transfer={t}
+                  avatarDefault={avatarDefault}
+                />
+              ))}
+            </View>
+          </View>
+        )}
       </View>
 
-      {/* 记录转账（仅限进行中 + 房主 + 多于1个玩家） */}
-      {!isSettled && isHost && players.length >= 2 && (
-        <View className='transfer-form'>
-          <Text className='section-title'>记录输赢</Text>
-
-          <View className='transfer-pickers'>
-            <Picker mode='selector' range={playerNames} value={fromIndex} onChange={(e) => setFromIndex(Number(e.detail.value))}>
-              <View className='picker-item'>
-                <Text className='picker-label'>输方</Text>
-                <Text className='picker-value'>{playerNames[fromIndex]}</Text>
+      {transferTarget && (
+        <View className='transfer-overlay' onClick={() => setTransferTarget(null)}>
+          <View className='transfer-dialog' onClick={e => e.stopPropagation()}>
+            <Text className='dialog-title'>转账给 {transferTarget.profile?.nickname}</Text>
+            <View className='dialog-body'>
+              <Text className='label'>金额</Text>
+              <View className='amount-display'>{transferAmount || '0'}</View>
+              <View className='input-row'>
+                {['1', '2', '3', '4', '5', '6', '7', '8', '9'].map(n => (
+                  <Button
+                    key={n}
+                    className='num-btn'
+                    onClick={() => setTransferAmount(prev => prev + n)}
+                  >{n}</Button>
+                ))}
+                <Button
+                  className='num-btn backspace'
+                  onClick={() => setTransferAmount(prev => prev.slice(0, -1))}
+                >回退</Button>
+                <Button
+                  className='num-btn zero'
+                  onClick={() => setTransferAmount(prev => prev + '0')}
+                >0</Button>
+                <Button
+                  className='num-btn clear'
+                  onClick={() => setTransferAmount('')}
+                >清空</Button>
               </View>
-            </Picker>
-
-            <Text className='transfer-arrow'>{'>'}</Text>
-
-            <Picker mode='selector' range={playerNames} value={toIndex} onChange={(e) => setToIndex(Number(e.detail.value))}>
-              <View className='picker-item'>
-                <Text className='picker-label'>赢方</Text>
-                <Text className='picker-value'>{playerNames[toIndex]}</Text>
-              </View>
-            </Picker>
-          </View>
-
-          <View className='transfer-amount'>
-            <Text className='amount-label'>金额</Text>
-            <Input
-              className='amount-input'
-              type='number'
-              value={amount}
-              onInput={(e) => setAmount(e.detail.value)}
-              placeholder='输入分数'
-            />
-            <Button
-              className='confirm-btn'
-              size='mini'
-              onClick={handleAddTransfer}
-              loading={submitting}
-              disabled={submitting}
-            >
-              确认
-            </Button>
+            </View>
+            <View className='dialog-footer'>
+              <Button className='btn-cancel' onClick={() => setTransferTarget(null)}>取消</Button>
+              <Button className='btn-confirm' onClick={handleAddTransfer} loading={submitting}>确认</Button>
+            </View>
           </View>
         </View>
       )}
 
-      {/* 转账历史 */}
-      <View className='transfer-history'>
-        <Text className='section-title'>转账记录</Text>
-        {room.transfers.length === 0 ? (
-          <Text className='empty-hint'>暂无记录</Text>
-        ) : (
-          room.transfers.map((t) => (
-            <View key={t.id} className='transfer-item'>
-              <View className='transfer-info'>
-                <Text className='transfer-from'>{t.from_profile?.nickname ?? '未知'}</Text>
-                <Text className='transfer-arrow-mini'>→</Text>
-                <Text className='transfer-to'>{t.to_profile?.nickname ?? '未知'}</Text>
-                <Text className='transfer-amount-value'>+{t.amount}</Text>
-              </View>
-              {!isSettled && isHost && (
-                <Button
-                  className='delete-btn'
-                  size='mini'
-                  onClick={() => handleDeleteTransfer(t.id, t.from_player, t.to_player, t.amount)}
-                >
-                  删除
-                </Button>
-              )}
-            </View>
-          ))
-        )}
-      </View>
+      <View className='room-footer'>
+        <View
+          className={`footer-tab ${activeTab === 'transfer' ? 'active' : ''}`}
+          onClick={() => handleTabSwitch('transfer')}
+        >
+          <Image className='icon' src={checkIcon} />
+          <Text className='text'>记账</Text>
+        </View>
 
-      {/* 底部操作按钮 */}
-      <View className='room-actions'>
-        {isSettled ? (
-          <>
-            <Button className='action-btn check-btn' onClick={handleGoCheck}>查看结算</Button>
-            <Button className='action-btn home-btn' onClick={handleGoHome}>返回首页</Button>
-          </>
-        ) : (
-          isHost && (
-            <Button className='action-btn settle-btn' onClick={handleSettle}>结算房间</Button>
-          )
-        )}
+        <View
+          className={`footer-tab reverse ${activeTab === 'history' ? 'active' : ''}`}
+          onClick={() => handleTabSwitch('history')}
+        >
+          <Text className='text'>记录</Text>
+          <Image className='icon' src={historyIcon} />
+        </View>
       </View>
     </View>
   )
