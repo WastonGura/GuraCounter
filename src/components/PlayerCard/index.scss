@@ -1,0 +1,65 @@
+.player-card {
+  position: relative;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  padding: 24rpx 30rpx;
+  background-color: #fff;
+  border-radius: 16rpx;
+  box-shadow: 0 4rpx 12rpx rgba(0, 0, 0, 0.06);
+  transition: transform 0.2s ease;
+
+  &:active {
+    transform: scale(0.97);
+  }
+
+  .card-left {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 20rpx;
+
+    .avatar {
+      width: 110rpx;
+      height: 110rpx;
+      border-radius: 55rpx;
+    }
+
+    .nickname {
+      font-size: 24rpx;
+      color: #7d7d7d;
+    }
+  }
+
+  .card-right {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 12rpx;
+
+    .decorator {
+      position: absolute;
+      width: 14rpx;
+      height: 14rpx;
+      border-radius: 8rpx;
+      right: 18rpx;
+      top: 18rpx;
+      background-color: #636363;
+    }
+
+    .score {
+      position: absolute;
+      font-size: 36rpx;
+      font-weight: bold;
+      color: #333;
+      bottom: 18rpx;
+      right: 18rpx;
+
+      &.negative {
+        color: #f49395;
+      }
+    }
+  }
+}
