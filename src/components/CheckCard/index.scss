@@ -1,0 +1,60 @@
+.check-card {
+  background-color: #fff;
+  border-radius: 16rpx;
+  box-shadow: 0 4rpx 12rpx rgba(0, 0, 0, 0.06);
+  overflow: hidden;
+
+  .payer {
+    display: flex;
+    align-items: center;
+    gap: 16rpx;
+    padding: 24rpx 30rpx;
+    background-color: #fdf2f2;
+
+    .avatar {
+      width: 72rpx;
+      height: 72rpx;
+      border-radius: 36rpx;
+    }
+
+    .name {
+      flex: 1;
+      font-size: 28rpx;
+      color: #333;
+    }
+
+    .label {
+      font-size: 24rpx;
+      color: #e76f6f;
+    }
+  }
+
+  .receivers {
+    padding: 16rpx 0;
+
+    .receiver-item {
+      display: flex;
+      align-items: center;
+      gap: 16rpx;
+      padding: 16rpx 30rpx;
+
+      .avatar {
+        width: 64rpx;
+        height: 64rpx;
+        border-radius: 32rpx;
+      }
+
+      .name {
+        flex: 1;
+        font-size: 26rpx;
+        color: #333;
+      }
+
+      .amount {
+        font-size: 30rpx;
+        font-weight: bold;
+        color: #e76f6f;
+      }
+    }
+  }
+}
