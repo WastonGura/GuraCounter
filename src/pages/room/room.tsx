@@ -1,10 +1,10 @@
 import { View, Text, Button, Image } from '@tarojs/components'
 import Taro, { useRouter, useDidShow } from '@tarojs/taro'
 import { useEffect, useState, useRef } from 'react'
-import { getRoomDetail, addTransfer as addTransferService, deleteTransfer, settleRoom } from '@/services/room'
+import { getRoomDetail, addTransfer as addTransferService, settleRoom } from '@/services/room'
 import { useRoomStore } from '@/stores/room'
 import { getCurrentUser } from '@/utils/auth'
-import type { RoomPlayer, RoomDetail } from '@/types/game'
+import type { RoomPlayer } from '@/types/game'
 import checkIcon from '@/assets/icons/check.svg'
 import historyIcon from '@/assets/icons/history.svg'
 import PlayerCard from '@/components/PlayerCard'
@@ -12,36 +12,13 @@ import InviteCard from '@/components/InviteCard'
 import TransferCard from '@/components/TransferCard'
 import './room.scss'
 
-// 开发模式：设为 true 直接预览 room 页面 UI，无需登录和创建房间
-const DEV_MOCK = true
-
-const MOCK_ROOM: RoomDetail = {
-  id: 'mock-room-1',
-  room_code: 'ABC123',
-  host_id: 'player-1',
-  status: 'playing',
-  created_at: new Date().toISOString(),
-  settled_at: null,
-  is_host: true,
-  players: [
-    { id: 'rp-1', room_id: 'mock-room-1', player_id: 'player-1', score: 150, joined_at: '', profile: { nickname: '小明', avatar_url: '' } },
-    { id: 'rp-2', room_id: 'mock-room-1', player_id: 'player-2', score: -60, joined_at: '', profile: { nickname: '小红', avatar_url: '' } },
-    { id: 'rp-3', room_id: 'mock-room-1', player_id: 'player-3', score: -90, joined_at: '', profile: { nickname: '小刚', avatar_url: '' } },
-  ],
-  transfers: [
-    { id: 't-1', room_id: 'mock-room-1', from_player: 'player-2', to_player: 'player-1', amount: 100, created_at: '', from_profile: { nickname: '小红', avatar_url: '' }, to_profile: { nickname: '小明', avatar_url: '' } },
-    { id: 't-2', room_id: 'mock-room-1', from_player: 'player-3', to_player: 'player-1', amount: 50, created_at: '', from_profile: { nickname: '小刚', avatar_url: '' }, to_profile: { nickname: '小明', avatar_url: '' } },
-  ],
-}
-
-const getMockCurrentUser = () => ({ id: 'player-1', nickname: '小明', avatar_url: '' })
 const avatarDefault = 'https://mmbiz.qpic.cn/mmbiz/icTdbqWNOwNRna42FI242Lcia07jQodd2FJGIYQfG0LAJGFxM4FbnQP6yfMxBgJ0F3YRqJCJ1aPAK2dQagdusBZg/0'
 
 const Room = () => {
   const router = useRouter()
-  const roomId = DEV_MOCK ? 'mock-room-1' : (router.params.roomId as string)
-  const currentUser = DEV_MOCK ? getMockCurrentUser() : getCurrentUser()
-  const { room, isHost, loading, setRoom, setLoading, addTransfer, removeTransfer, updatePlayerScore, clearRoom } = useRoomStore()
+  const roomId = router.params.roomId as string
+  const currentUser = getCurrentUser()
+  const { room, loading, setRoom, setLoading, addTransfer, updatePlayerScore, clearRoom } = useRoomStore()
 
   // 底部标签页切换
   const [activeTab, setActiveTab] = useState<'transfer' | 'history'>('transfer')
@@ -69,10 +46,6 @@ const Room = () => {
   }
 
   useEffect(() => {
-    if (DEV_MOCK) {
-      setRoom(MOCK_ROOM, true)
-      return () => clearRoom()
-    }
     setLoading(true)
     fetchRoom().then(startPolling)
     return () => {
@@ -83,17 +56,8 @@ const Room = () => {
 
   // 页面从其他页面返回时刷新
   useDidShow(() => {
-    if (DEV_MOCK) return
     if (roomId) fetchRoom()
   })
-
-  // 复制房间码
-  // const handleCopyCode = async () => {
-  //   if (!room) return
-  //   await Taro.vibrateShort({ type: 'light' })
-  //   Taro.setClipboardData({ data: room.room_code })
-  //   Taro.showToast({ title: '房间码已复制', icon: 'success' })
-  // }
 
   // 进入个人中心
   const handleAvatarClick = async () => {
@@ -137,18 +101,18 @@ const Room = () => {
     }
   }
 
-  // 删除转账
-  const handleDeleteTransfer = async (transferId: string, fromPlayer: string, toPlayer: string, transferAmount: number) => {
-    try {
-      await deleteTransfer(transferId)
-      removeTransfer(transferId)
-      updatePlayerScore(fromPlayer, (room!.players.find(p => p.player_id === fromPlayer)?.score ?? 0) + transferAmount)
-      updatePlayerScore(toPlayer, (room!.players.find(p => p.player_id === toPlayer)?.score ?? 0) - transferAmount)
-      Taro.showToast({ title: '已删除', icon: 'success' })
-    } catch (e: any) {
-      Taro.showToast({ title: e.message ?? '删除失败', icon: 'error' })
-    }
-  }
+  // // 删除转账
+  // const handleDeleteTransfer = async (transferId: string, fromPlayer: string, toPlayer: string, transferAmount: number) => {
+  //   try {
+  //     await deleteTransfer(transferId)
+  //     removeTransfer(transferId)
+  //     updatePlayerScore(fromPlayer, (room!.players.find(p => p.player_id === fromPlayer)?.score ?? 0) + transferAmount)
+  //     updatePlayerScore(toPlayer, (room!.players.find(p => p.player_id === toPlayer)?.score ?? 0) - transferAmount)
+  //     Taro.showToast({ title: '已删除', icon: 'success' })
+  //   } catch (e: any) {
+  //     Taro.showToast({ title: e.message ?? '删除失败', icon: 'error' })
+  //   }
+  // }
 
   // 切换标签
   const handleTabSwitch = async (tab: 'transfer' | 'history') => {
@@ -166,23 +130,10 @@ const Room = () => {
       await settleRoom(room.id, currentUser.id)
       Taro.removeStorageSync('current_room')
       Taro.showToast({ title: '结算成功', icon: 'success' })
-      fetchRoom()
+      Taro.navigateTo({ url: `/pages/check/check?roomId=${room.id}` })
     } catch (e: any) {
       Taro.showToast({ title: e.message ?? '结算失败', icon: 'error' })
     }
-  }
-
-  // 跳转结算页
-  const handleGoCheck = async () => {
-    if (!room) return
-    await Taro.vibrateShort({ type: 'light' })
-    Taro.navigateTo({ url: `/pages/check/check?roomId=${room.id}` })
-  }
-
-  // 返回首页
-  const handleGoHome = async () => {
-    await Taro.vibrateShort({ type: 'light' })
-    Taro.navigateBack()
   }
 
   if (loading || !room) {
@@ -190,8 +141,6 @@ const Room = () => {
   }
 
   const players = room.players
-  const isSettled = room.status === 'settled'
-  // const playerNames = players.map(p => p.profile?.nickname ?? '未知')
 
   return (
     <View className='room-container'>
