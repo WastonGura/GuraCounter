@@ -1,0 +1,66 @@
+.transfer-card {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  padding: 24rpx 30rpx;
+  background-color: #fff;
+  border-radius: 16rpx;
+  box-shadow: 0 4rpx 12rpx rgba(0, 0, 0, 0.06);
+
+  .transfer-from, .transfer-to {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8rpx;
+    width: 120rpx;
+
+    .avatar {
+      width: 72rpx;
+      height: 72rpx;
+      border-radius: 36rpx;
+    }
+
+    .name {
+      font-size: 20rpx;
+      color: #666;
+    }
+  }
+
+  .transfer-middle {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8rpx;
+
+    .amount {
+      font-size: 32rpx;
+      font-weight: bold;
+      color: #333;
+    }
+
+    .arrow {
+      display: flex;
+      flex-direction: row;
+      align-items: center;
+      width: 100%;
+      padding: 0 12rpx;
+      box-sizing: border-box;
+
+      .arrow-line {
+        flex: 1;
+        height: 4rpx;
+        background-color: #ccc;
+      }
+
+      .arrow-head {
+        width: 0;
+        height: 0;
+        border-top: 10rpx solid transparent;
+        border-bottom: 10rpx solid transparent;
+        border-left: 14rpx solid #ccc;
+      }
+    }
+  }
+}
