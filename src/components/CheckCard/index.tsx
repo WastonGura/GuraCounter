@@ -18,9 +18,11 @@ const CheckCard = ({ payerName, payerAvatar, receivers, avatarDefault }: CheckCa
   return (
     <View className='check-card'>
       <View className='payer'>
-        <Image className='avatar' src={payerAvatar || avatarDefault} />
-        <Text className='name'>{payerName}</Text>
-        <Text className='label'>需支付</Text>
+        <View className='player'>
+            <Image className='avatar' src={payerAvatar || avatarDefault} />
+            <Text className='name'>{payerName}</Text>
+        </View>
+        <Text className='label'>支付</Text>
       </View>
       <View className='receivers'>
         {receivers.map((r, i) => (
