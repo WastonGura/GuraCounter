@@ -29,7 +29,9 @@
     "dev:rn": "npm run build:rn -- --watch",
     "dev:qq": "npm run build:qq -- --watch",
     "dev:jd": "npm run build:jd -- --watch",
-    "dev:harmony-hybrid": "npm run build:harmony-hybrid -- --watch"
+    "dev:harmony-hybrid": "npm run build:harmony-hybrid -- --watch",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "browserslist": [
     "defaults and fully supports es6-module",
@@ -83,6 +85,7 @@
     "stylelint-config-standard": "^38.0.0",
     "terser": "^5.30.4",
     "typescript": "^5.4.5",
-    "vite": "^4.2.0"
+    "vite": "^4.2.0",
+    "vitest": "^4.1.8"
   }
 }
